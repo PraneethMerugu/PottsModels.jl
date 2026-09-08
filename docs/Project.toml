@@ -1,0 +1,12 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+PottsModels = "d96e602c-5c36-4c60-bc86-1ae31a2f1743"
+Potts = "e4c62a4c-8889-4cc8-ad3a-75efc86c53b9"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+
+[compat]
+Documenter = "1"
+PottsModels = "0.1"
+Potts = "0.3"
+SciMLBase = "3"
+julia = "1.12"
