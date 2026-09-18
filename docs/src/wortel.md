@@ -11,7 +11,9 @@ not reproduce a calibrated speed–persistence campaign.
 
 ```@example wortel
 using PottsModels
-include(joinpath(pkgdir(PottsModels), "tutorials", "wortel_migration.jl"))
+Main.CITelemetry.record_duration("documentation.wortel"; kind="tutorial") do
+    include(joinpath(pkgdir(PottsModels), "tutorials", "wortel_migration.jl"))
+end
 ```
 
 Execution here is sequential CPU with Float32. GPU and 3D support are not

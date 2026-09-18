@@ -6,7 +6,9 @@ bounded cell capacity and conservative division-state splitting.
 
 ```@example openvt
 using PottsModels
-include(joinpath(pkgdir(PottsModels), "tutorials", "openvt_monolayer.jl"))
+Main.CITelemetry.record_duration("documentation.openvt"; kind="tutorial") do
+    include(joinpath(pkgdir(PottsModels), "tutorials", "openvt_monolayer.jl"))
+end
 classification = classify_surface(final.ownership)
 (; calibration_steps=relaxation_steps(), states=classification.states)
 ```

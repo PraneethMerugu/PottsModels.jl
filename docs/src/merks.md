@@ -12,7 +12,9 @@ lacuna, branching or remodeling statistics.
 
 ```@example merks
 using PottsModels
-include(joinpath(pkgdir(PottsModels), "tutorials", "merks_vasculogenesis.jl"))
+Main.CITelemetry.record_duration("documentation.merks"; kind="tutorial") do
+    include(joinpath(pkgdir(PottsModels), "tutorials", "merks_vasculogenesis.jl"))
+end
 ```
 
 The saved observation is checked against the concentration field in the model
