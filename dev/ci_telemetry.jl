@@ -54,13 +54,31 @@ module CITelemetry
         end
     end
 
+    function record_precompile(label, path)
+        output = read(path, String)
+        durations = map(
+            match -> parse(Float64, match.captures[1]),
+            eachmatch(r"successfully precompiled in ([0-9.]+) seconds", output),
+        )
+        status = isempty(durations) ? "not_observed" : "observed"
+        return emit_record(
+            label, sum(durations), status; kind = "precompile"
+        )
+    end
+
     function main(arguments)
-        length(arguments) >= 3 && arguments[1] == "measure" && arguments[3] == "--" ||
-            error("usage: julia dev/ci_telemetry.jl measure LABEL -- COMMAND [ARG ...]")
-        command = Cmd(arguments[4:end])
-        return record_duration(arguments[2]) do
-            run(command)
+        if length(arguments) >= 3 && arguments[1] == "measure" && arguments[3] == "--"
+            command = Cmd(arguments[4:end])
+            return record_duration(arguments[2]) do
+                run(command)
+            end
+        elseif length(arguments) == 3 && arguments[1] == "precompile-log"
+            return record_precompile(arguments[2], arguments[3])
         end
+        error(
+            "usage: julia dev/ci_telemetry.jl measure LABEL -- COMMAND [ARG ...] " *
+                "or julia dev/ci_telemetry.jl precompile-log LABEL LOG"
+        )
     end
 
 end

@@ -68,9 +68,17 @@ jobs:
           git -C deps/CorePotts rev-parse HEAD
           git -C deps/Potts rev-parse HEAD
       - name: Prepare explicit developer environment
-        run: julia --startup-file=no dev/ci_telemetry.jl measure environment.setup -- julia --startup-file=no dev/setup.jl "${RUNNER_TEMP}/models-dev" deps/LocalMath deps/CorePotts deps/Potts
+        shell: bash
+        run: |
+          set -o pipefail
+          julia --startup-file=no dev/ci_telemetry.jl measure environment.setup -- julia --startup-file=no dev/setup.jl "${RUNNER_TEMP}/models-dev" deps/LocalMath deps/CorePotts deps/Potts 2>&1 | tee "${RUNNER_TEMP}/ci-telemetry/environment-setup.log"
+          julia --startup-file=no dev/ci_telemetry.jl precompile-log environment.automatic_precompile "${RUNNER_TEMP}/ci-telemetry/environment-setup.log"
       - name: Test model library
-        run: julia --startup-file=no dev/ci_telemetry.jl measure package.test -- julia --project="${RUNNER_TEMP}/models-dev" --startup-file=no -e 'using Pkg; Pkg.test("PottsModels")'
+        shell: bash
+        run: |
+          set -o pipefail
+          julia --startup-file=no dev/ci_telemetry.jl measure package.test -- julia --project="${RUNNER_TEMP}/models-dev" --startup-file=no -e 'using Pkg; Pkg.test("PottsModels")' 2>&1 | tee "${RUNNER_TEMP}/ci-telemetry/package-test.log"
+          julia --startup-file=no dev/ci_telemetry.jl precompile-log package.test_precompile "${RUNNER_TEMP}/ci-telemetry/package-test.log"
       - name: Build executable tutorials
         run: julia --startup-file=no dev/ci_telemetry.jl measure documentation.build -- julia --startup-file=no dev/docs.jl deps/LocalMath deps/CorePotts deps/Potts
       - name: Upload phase telemetry
