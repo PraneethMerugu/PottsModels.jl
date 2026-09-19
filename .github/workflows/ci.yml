@@ -22,6 +22,11 @@ on:
 permissions:
   contents: read
 
+env:
+  LOCALMATH_REF: ${{ inputs.localmath_ref || 'b699002a05f84e240e34162d509d6b952bf7d437' }}
+  COREPOTTS_REF: ${{ inputs.corepotts_ref || '7183bcec81afc34028153f8674d1992b625fd2bc' }}
+  POTTS_REF: ${{ inputs.potts_ref || '868a22ff432e33f0a1dc0ba4879102539a0a0c8d' }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -35,22 +40,27 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: PraneethMerugu/LocalMath.jl
-          ref: ${{ inputs.localmath_ref || 'b699002a05f84e240e34162d509d6b952bf7d437' }}
+          ref: ${{ env.LOCALMATH_REF }}
           path: deps/LocalMath
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: PraneethMerugu/CorePotts.jl
-          ref: ${{ inputs.corepotts_ref || '7183bcec81afc34028153f8674d1992b625fd2bc' }}
+          ref: ${{ env.COREPOTTS_REF }}
           path: deps/CorePotts
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: PraneethMerugu/Potts.jl
-          ref: ${{ inputs.potts_ref || '868a22ff432e33f0a1dc0ba4879102539a0a0c8d' }}
+          ref: ${{ env.POTTS_REF }}
           path: deps/Potts
       - uses: julia-actions/setup-julia@fa02766e078afaaf09b14210362cee14137e6a32 # v3
         with:
           version: '1.12.6'
       - uses: julia-actions/cache@a45e8fa8be21c18a06b7177052533149e61e9b38 # v3
+      - name: Initialize phase telemetry
+        run: |
+          mkdir -p "${RUNNER_TEMP}/ci-telemetry"
+          : > "${RUNNER_TEMP}/ci-telemetry/models.jsonl"
+          printf 'CI_TELEMETRY_PATH=%s\n' "${RUNNER_TEMP}/ci-telemetry/models.jsonl" >> "$GITHUB_ENV"
       - name: Show selected revisions
         run: |
           git rev-parse HEAD
@@ -58,8 +68,23 @@ jobs:
           git -C deps/CorePotts rev-parse HEAD
           git -C deps/Potts rev-parse HEAD
       - name: Prepare explicit developer environment
-        run: julia --startup-file=no dev/setup.jl "${RUNNER_TEMP}/models-dev" deps/LocalMath deps/CorePotts deps/Potts
+        shell: bash
+        run: |
+          set -o pipefail
+          julia --startup-file=no dev/ci_telemetry.jl measure environment.setup -- julia --startup-file=no dev/setup.jl "${RUNNER_TEMP}/models-dev" deps/LocalMath deps/CorePotts deps/Potts 2>&1 | tee "${RUNNER_TEMP}/ci-telemetry/environment-setup.log"
+          julia --startup-file=no dev/ci_telemetry.jl precompile-log environment.automatic_precompile "${RUNNER_TEMP}/ci-telemetry/environment-setup.log"
       - name: Test model library
-        run: julia --project="${RUNNER_TEMP}/models-dev" --startup-file=no -e 'using Pkg; Pkg.test("PottsModels")'
+        shell: bash
+        run: |
+          set -o pipefail
+          julia --startup-file=no dev/ci_telemetry.jl measure package.test -- julia --project="${RUNNER_TEMP}/models-dev" --startup-file=no -e 'using Pkg; Pkg.test("PottsModels")' 2>&1 | tee "${RUNNER_TEMP}/ci-telemetry/package-test.log"
+          julia --startup-file=no dev/ci_telemetry.jl precompile-log package.test_precompile "${RUNNER_TEMP}/ci-telemetry/package-test.log"
       - name: Build executable tutorials
-        run: julia --startup-file=no dev/docs.jl deps/LocalMath deps/CorePotts deps/Potts
+        run: julia --startup-file=no dev/ci_telemetry.jl measure documentation.build -- julia --startup-file=no dev/docs.jl deps/LocalMath deps/CorePotts deps/Potts
+      - name: Upload phase telemetry
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: models-phase-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-telemetry/models.jsonl
+          if-no-files-found: error

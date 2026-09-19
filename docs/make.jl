@@ -1,6 +1,9 @@
 using Documenter
 using PottsModels
 
+include(joinpath(dirname(@__DIR__), "dev", "ci_telemetry.jl"))
+using .CITelemetry: record_duration
+
 makedocs(;
     modules = [PottsModels],
     sitename = "PottsModels.jl",

@@ -5,6 +5,9 @@ using SciMLBase: solve, ReturnCode
 using Aqua
 using ExplicitImports
 
+include(joinpath(dirname(@__DIR__), "dev", "ci_telemetry.jl"))
+using .CITelemetry: record_duration
+
 include("test_developer_environment.jl")
 
 function trajectory(factory, scalar_type, observable; seed = 0x3302)
@@ -23,14 +26,24 @@ end
             (openvt_monolayer, Float64, :tissue_sites, 0x3306),
         )
         @testset "$(factory)" begin
-            first_run = trajectory(factory, scalar, observable; seed)
-            replay = trajectory(factory, scalar, observable; seed)
+            model_name = string(factory)
+            first_run = record_duration(
+                () -> trajectory(factory, scalar, observable; seed),
+                "model.$model_name.first"; kind = "trajectory"
+            )
+            replay = record_duration(
+                () -> trajectory(factory, scalar, observable; seed),
+                "model.$model_name.replay"; kind = "trajectory"
+            )
             @test first_run.retcode == ReturnCode.Success
             @test replay.retcode == ReturnCode.Success
             @test last(first_run).mcs == 2
             @test [s.ownership for s in first_run] == [s.ownership for s in replay]
             @test [s[observable] for s in first_run] == [s[observable] for s in replay]
-            different_seed = trajectory(factory, scalar, observable; seed = seed + 1)
+            different_seed = record_duration(
+                () -> trajectory(factory, scalar, observable; seed = seed + 1),
+                "model.$model_name.different_seed"; kind = "trajectory"
+            )
             @test different_seed.retcode == ReturnCode.Success
             @test [s.ownership for s in first_run] != [s.ownership for s in different_seed]
 
@@ -39,10 +52,15 @@ end
             problem = PottsProblem(model.system, model.initial, (0, 2); seed)
             solve(problem, SequentialCPM(); backend = CPUBackend(), scalar_type = scalar)
             fresh_problem = PottsProblem(model.system, model.initial, (0, 2); seed)
-            reused = solve(
-                fresh_problem, SequentialCPM(); backend = CPUBackend(),
-                scalar_type = scalar, save_everystep = true, observables = (observable,)
-            )
+            reused = record_duration(
+                "model.$model_name.reused"; kind = "trajectory"
+            ) do
+                solve(
+                    fresh_problem, SequentialCPM(); backend = CPUBackend(),
+                    scalar_type = scalar, save_everystep = true,
+                    observables = (observable,)
+                )
+            end
             @test [s.ownership for s in reused] == [s.ownership for s in first_run]
             @test [s[observable] for s in reused] == [s[observable] for s in first_run]
         end
