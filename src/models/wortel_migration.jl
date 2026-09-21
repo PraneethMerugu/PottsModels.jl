@@ -3,6 +3,28 @@
 
 Activity-coupled migration on an 8×8 periodic lattice. Returns fresh model declarations and initialization without solving. This bounded example is not a calibrated reproduction of Wortel et al. (2021).
 """
+_wortel_geometric_finish(total, count) = exp(total / count)
+
+function _wortel_local_activity(activity, lane, anchor, owner)
+    values = gather(
+        site_value(activity, lane);
+        bind = lane,
+        at = anchor,
+        over = :act_neighbors,
+        where = site_owner(lane) == owner,
+    )
+    return LocalMath.fold(values;
+        map = log,
+        combine = +,
+        init = 0.0,
+        finish = _wortel_geometric_finish,
+        domain = >=(0.0),
+        invalid = :reject,
+        empty = 0.0,
+        order = :canonical,
+    )
+end
+
 function wortel_migration()
     @variables activity_value activity_history
     @parameters begin
@@ -31,7 +53,17 @@ function wortel_migration()
         cadence = EveryMCS(),
     )
     copy = ProposalContext(:copy)
+    lane = SiteBinding(:act_neighbor)
     surface_anchor = CellBinding(:surface_anchor)
+    source_activity = _wortel_local_activity(
+        activity, lane, copy.source_site, copy.source_cell)
+    target_activity = _wortel_local_activity(
+        activity, lane, copy.target_site, copy.target_cell)
+    inverse_maximum_activity = exp(-log(maximum_activity))
+    act_drive = -(activity_strength * inverse_maximum_activity) * (
+        ifelse(kind_matches(copy.source_kind, endothelial), source_activity, 0.0) -
+        ifelse(kind_matches(copy.target_kind, endothelial), target_activity, 0.0)
+    )
 
     system = PottsSystem(
         name = :wortel_2021,
@@ -44,7 +76,7 @@ function wortel_migration()
                         proposal = Moore(),
                         contact = Moore(),
                         surface = Moore(),
-                        activity_neighborhood = Moore(),
+                        act_neighbors = Moore(; include_center = true),
                         connectivity = Moore(),
                         connectivity_background = VonNeumann(),
                     ),
@@ -66,17 +98,13 @@ function wortel_migration()
                 )
                 activity
                 memory
-                ActEnergy(
-                    endothelial,
-                    activity_value;
-                    maximum = maximum_activity,
-                    strength = activity_strength,
-                    reduction = :activity_neighborhood,
+                ProposalDrive(
+                    :activity_drive, act_drive; drive_scale = :energy
                 )
                 AcceptedCopy(
                     :activate,
                     Assign(activity_value, maximum_activity);
-                    when = copy.is_extension,
+                    when = kind_matches(copy.source_kind, endothelial),
                 )
                 Synchronous(
                     :decay,

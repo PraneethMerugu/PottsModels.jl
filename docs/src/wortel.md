@@ -2,7 +2,10 @@
 
 The Wortel-inspired bounded model uses an 8×8 periodic lattice with Moore
 relations, volume/contact/surface energies, local connectivity and per-site
-activity. An accepted extension activates the copied site; completed-MCS decay
+activity. Its proposal drive is composed from a lane-bound `SiteState` gather,
+an exact-owner predicate, and a canonical `LocalMath.fold` implementing the raw
+geometric mean over the center-inclusive Moore neighborhood. Every accepted
+copy from the modeled cell kind activates the copied site; completed-MCS decay
 and retained history age it; ownership changes clear it.
 
 These are CPM event and spatial-identity semantics. A per-cell ODE would not
