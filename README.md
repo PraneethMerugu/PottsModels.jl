@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> **This repository is archived.** PottsModels now lives in the Potts.jl monorepo at
+> [`lib/PottsModels`](https://github.com/PraneethMerugu/Potts.jl/tree/main/lib/PottsModels), together with Potts, CorePotts and the other packages.
+> Every earlier branch of this repository is kept as an `archive/*` or `legacy/*` tag.
+
 # PottsModels.jl
 
 Reusable scientific model declarations and executable modeling tutorials for
